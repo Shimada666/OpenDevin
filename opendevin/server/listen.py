@@ -339,5 +339,3 @@ async def docs_redirect():
     response = RedirectResponse(url='/index.html')
     return response
 
-
-app.mount('/', StaticFiles(directory='./frontend/dist'), name='dist')
