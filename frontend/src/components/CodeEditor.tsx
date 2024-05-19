@@ -4,13 +4,12 @@ import type { editor } from "monaco-editor";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { VscCode } from "react-icons/vsc";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { I18nKey } from "#/i18n/declaration";
 import { selectFile } from "#/services/fileService";
-import { setCode } from "#/state/codeSlice";
-import { RootState } from "#/store";
 import FileExplorer from "./file-explorer/FileExplorer";
 import { CodeEditorContext } from "./CodeEditorContext";
+import { RootState } from "#/store";
 
 function CodeEditor(): JSX.Element {
   const { t } = useTranslation();
@@ -24,9 +23,11 @@ function CodeEditor(): JSX.Element {
     [selectedFileAbsolutePath],
   );
 
-  const dispatch = useDispatch();
-  const code = useSelector((state: RootState) => state.code.code);
+  // const dispatch = useDispatch();
+  // const code = useSelector((state: RootState) => state.code.code);
   const activeFilepath = useSelector((state: RootState) => state.code.path);
+
+  const [code, setCode] = useState("");
 
   const handleEditorDidMount = (
     editor: editor.IStandaloneCodeEditor,
@@ -48,17 +49,23 @@ function CodeEditor(): JSX.Element {
 
   const updateCode = async () => {
     const newCode = await selectFile(activeFilepath);
+
+    setCode(newCode);
     setSelectedFileAbsolutePath(activeFilepath);
-    dispatch(setCode(newCode));
+    // dispatch(setCode(newCode));
   };
 
   React.useEffect(() => {
     // FIXME: we can probably move this out of the component and into state/service
-    if (activeFilepath) updateCode();
+    if (activeFilepath) {
+      console.log(1);
+      updateCode();
+    }
   }, [activeFilepath]);
 
   return (
     <div className="flex h-full w-full bg-neutral-900 transition-all duration-500 ease-in-out">
+      <div>{codeEditorContext.selectedFileAbsolutePath}</div>
       <CodeEditorContext.Provider value={codeEditorContext}>
         <FileExplorer />
         <div className="flex flex-col min-h-0 w-full">
@@ -86,13 +93,16 @@ function CodeEditor(): JSX.Element {
                 {t(I18nKey.CODE_EDITOR$EMPTY_MESSAGE)}
               </div>
             ) : (
-              <Editor
-                height="100%"
-                path={selectedFileName.toLocaleLowerCase()}
-                defaultValue=""
-                value={code}
-                onMount={handleEditorDidMount}
-              />
+              <div>
+                <div className="float-left">{code}</div>
+                <Editor
+                  height="500px"
+                  path={selectedFileName.toLocaleLowerCase()}
+                  defaultValue=""
+                  value={code}
+                  onMount={handleEditorDidMount}
+                />
+              </div>
             )}
           </div>
         </div>

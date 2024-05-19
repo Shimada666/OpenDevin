@@ -355,4 +355,4 @@ async def docs_redirect():
     return response
 
 
-app.mount('/', StaticFiles(directory='./frontend/dist'), name='dist')
+# app.mount('/', StaticFiles(directory='./frontend/dist'), name='dist')

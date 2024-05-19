@@ -399,7 +399,7 @@ if __name__ == '__main__':
         output_fp.flush()
 
     # This sets the multi-processing
-    num_workers = args.eval_num_workers
+    num_workers = 1
     logger.info(f'Using {num_workers} workers for evaluation.')
 
     # This is SWE-Bench specific - CodeActAgent doesn't require mounted workspace to work
