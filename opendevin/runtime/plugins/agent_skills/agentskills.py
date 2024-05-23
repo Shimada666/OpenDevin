@@ -269,7 +269,7 @@ def edit_file(start: int, end: int, content: str) -> None:
 
             # recover the original file
             with open(original_file_backup_path, 'r') as fin, open(
-                    CURRENT_FILE, 'w'
+                CURRENT_FILE, 'w'
             ) as fout:
                 fout.write(fin.read())
             os.remove(original_file_backup_path)
