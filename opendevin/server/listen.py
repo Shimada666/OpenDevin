@@ -4,6 +4,10 @@ import uuid
 import warnings
 from pathlib import Path
 
+from opendevin.llm.llm import LLM
+from opendevin.llm.readers import IMGReader
+from opendevin.core.config import args, get_llm_config_arg
+
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     import litellm
@@ -144,7 +148,7 @@ async def get_agents():
 
 @app.get('/api/auth')
 async def get_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
 ):
     """
     Generate a JWT for authentication when starting a WebSocket connection. This endpoint checks if valid credentials
@@ -173,7 +177,7 @@ async def get_token(
 
 @app.get('/api/messages')
 async def get_messages(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
 ):
     """
     Get messages.
@@ -193,7 +197,7 @@ async def get_messages(
 
 @app.get('/api/messages/total')
 async def get_message_total(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
 ):
     """
     Get total message count.
@@ -209,7 +213,7 @@ async def get_message_total(
 
 @app.delete('/api/messages')
 async def del_messages(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
 ):
     """
     Delete messages.
@@ -310,7 +314,7 @@ async def upload_files(files: list[UploadFile]):
 
 @app.get('/api/root_task')
 def get_root_task(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+        credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
 ):
     """
     Get root_task.
@@ -353,6 +357,19 @@ async def docs_redirect():
     """
     response = RedirectResponse(url='/index.html')
     return response
+
+
+@app.get('/test')
+async def test():
+
+    # reader = IMGReader()
+    # return response
+    llm = LLM(llm_config=args.llm_config)
+    reader = IMGReader(llm)
+    resp = reader.parse(Path('/Users/zhengmingzhang/Desktop/33391300.jpeg'))
+    # reader = IMGReader(llm)
+    # resp = reader.parse(Path('/Users/zhengmingzhang/Desktop/33391300.jpeg'))
+    return resp
 
 
 app.mount('/', StaticFiles(directory='./frontend/dist'), name='dist')

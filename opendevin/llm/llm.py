@@ -5,6 +5,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     import litellm
 from litellm import completion as litellm_completion
+from litellm import transcription as litellm_transcription
 from litellm import completion_cost as litellm_completion_cost
 from litellm.exceptions import (
     APIConnectionError,
@@ -188,7 +189,11 @@ class LLM:
                 messages = args[1]
             debug_message = ''
             for message in messages:
-                debug_message += message_separator + message['content']
+                content = message['content']
+                if isinstance(content, str):
+                    debug_message += message_separator + message['content']
+                else:
+                    debug_message += message_separator + str(content)
             llm_prompt_logger.debug(debug_message)
             resp = completion_unwrapped(*args, **kwargs)
             message_back = resp['choices'][0]['message']['content']

@@ -1,3 +1,22 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+INSTALL
+-------
+pip install openai --upgrade
+pip install python-docx
+pip install markdown
+pip install PyPDF2
+pip install openpyxl
+pip install beautifulsoup4
+pip install pylatexenc
+pip install python-pptx
+pip install xlrd
+pip install base64
+pip install opencv-python
+"""
+
 import base64
 import json
 import subprocess
@@ -17,31 +36,31 @@ import PyPDF2
 import requests
 import yaml
 from bs4 import BeautifulSoup
+
+# from litellm import completion as litellm_completion
+# from opendevin.llm.llm import LLM
 from openai import OpenAI
 from pptx import Presentation
 from pylatexenc.latex2text import LatexNodes2Text
 
+from litellm import transcription
 from opendevin.core.config import config
 from opendevin.core.logger import opendevin_logger as logger
-from opendevin.llm.llm import LLM
 
-# TODO: Find way to directly get the API key from ConfigType.LLM_API_KEY or change it with litellm.
-OPENAI_API_KEY = config.llm.api_key
+# TODO: Double-check where the interface for the stored API key is in OpenDevin.
+# TODO: Or ask someone familiar to change it with litellm.
+# OPENAI_API_KEY = 'PUT_YOUR_OPEN_AI_API'
 
 
 class Reader(ABC):
     """
     @Desc: Implementation to support reading 41 multimodal files efficiently.
-    @Ref: https://github.com/metauto-ai/GPTSwarm/blob/main/swarm/environment/tools/reader/readers.py
+    @Ref: https://github.com/mczhuge/GPTSwarm/blob/main/swarm/environment/tools/reader/readers.py
     """
-
-    def __init__(self, llm: LLM = None):
-        self.llm = llm
 
     @abstractmethod
     def parse(self, file_path: Path) -> str:
         """To be overriden by the descendant class"""
-        pass
 
 
 class TXTReader(Reader):
@@ -143,16 +162,10 @@ class LaTexReader(Reader):
 class AudioReader(Reader):
     @staticmethod
     def parse(file_path: Path) -> str:
-        api_key = OPENAI_API_KEY
         logger.info(f'Transcribing audio file from {file_path}.')
-        client = OpenAI(api_key=api_key)
         try:
-            # TODO: record the COST of the API call
-            client = OpenAI()
             with open(file_path, 'rb') as audio_file:
-                transcript = client.audio.translations.create(
-                    model='whisper-1', file=audio_file
-                )
+                transcript = transcription(model="whisper-1", file=audio_file)
             return transcript.text
 
         except Exception as e:
@@ -227,6 +240,8 @@ class PythonReader(Reader):
     def parse(self, file_path: Path) -> str:
         logger.info(f'Executing and reading Python file from {file_path}.')
         execution_result = ''
+        # error = ''
+        # file_content = ''
         try:
             completed_process = subprocess.run(
                 ['python', file_path], capture_output=True, text=True, check=True
@@ -247,9 +262,6 @@ class PythonReader(Reader):
 
 
 class IMGReader(Reader):
-    def __init__(self, llm: LLM = None):
-        super().__init__(llm)
-
     def base64_img(self, file_path: Path) -> str:
         import base64
 
@@ -257,15 +269,12 @@ class IMGReader(Reader):
             encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
         return encoded_image
 
-    def parse(
-            self, file_path: Path, task: str = 'Describe this image as detail as possible.'
-    ) -> str:
-        logger.info(f'Reading image file from {file_path}.')
-        # TODO: record the COST of the API call
-        try:
-
-            base64_image = self.base64_img(Path(file_path))
-            messages = [
+    def prepare_api_call(
+        self, task: str, base64_frame: str, model='gpt-4o-2024-05-13', max_token=500
+    ) -> dict:
+        return {
+            'model': model,
+            'messages': [
                 {
                     'role': 'user',
                     'content': [
@@ -273,15 +282,36 @@ class IMGReader(Reader):
                         {
                             'type': 'image_url',
                             'image_url': {
-                                'url': f'data:image/jpeg;base64,{base64_image}'
+                                'url': f'data:image/jpeg;base64,{base64_frame}'
                             },
                         },
                     ],
                 }
-            ]
+            ],
+            'max_tokens': max_token,
+        }
 
-            resp = self.llm.completion(messages=messages)
-            return resp['choices'][0]['message']['content']
+    # def get_headers(self) -> dict:
+    #     return {
+    #         'Content-Type': 'application/json',
+    #         'Authorization': f'Bearer {OPENAI_API_KEY}',
+    #     }
+
+    def parse(
+        self, file_path: Path, task: str = 'Describe this image as detail as possible.'
+    ) -> str:
+        logger.info(f'Reading image file from {file_path}.')
+
+        try:
+            # openai_proxy: str = 'https://api.openai.com/v1/chat/completions'
+            base64_image = self.base64_img(Path(file_path))
+            api_call = self.prepare_api_call(task, base64_image)
+            # response = requests.post(
+            #     openai_proxy, headers=self.get_headers(), json=api_call
+            # )
+            out = response.json()
+            content = out['choices'][0]['message']['content']
+            return content
 
         except Exception as error:
             logger.error(f'Error with the request: {error}')
@@ -304,13 +334,40 @@ class VideoReader(Reader):
         video.release()
         return base64_frames
 
+    def prepare_api_call(
+        self, task: str, base64_frame: str, model='gpt-4o-2024-05-13', max_token=500
+    ) -> dict:
+        return {
+            'model': model,
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': [
+                        {'type': 'text', 'text': task},
+                        {
+                            'type': 'image_url',
+                            'image_url': {
+                                'url': f'data:image/jpeg;base64,{base64_frame}'
+                            },
+                        },
+                    ],
+                }
+            ],
+            'max_tokens': max_token,
+        }
+
+    # def get_headers(self) -> dict:
+    #     return {
+    #         'Content-Type': 'application/json',
+    #         'Authorization': f'Bearer {OPENAI_API_KEY}',
+    #     }
 
     def parse(
-            self,
-            file_path: Path,
-            task: str = 'Describe this image as detail as possible.',
-            frame_interval: int = 30,
-            used_audio: bool = True,
+        self,
+        file_path: Path,
+        task: str = 'Describe this image as detail as possible.',
+        frame_interval: int = 30,
+        used_audio: bool = True,
     ) -> str:
         logger.info(
             f'Processing video file from {file_path} with frame interval {frame_interval}.'
@@ -334,13 +391,13 @@ class VideoReader(Reader):
             logger.info(
                 f'Process the {file_path}, current No. {idx * frame_interval} frame...'
             )
-            # TODO: record the COST of the API call
+
             api_call = self.prepare_api_call(task, base64_frame)
             try:
-                openai_proxy: str = 'https://api.openai.com/v1/chat/completions'
-                response = requests.post(
-                    openai_proxy, headers=self.get_headers(), json=api_call
-                )
+                # openai_proxy: str = 'https://api.openai.com/v1/chat/completions'
+                # response = requests.post(
+                #     openai_proxy, headers=self.get_headers(), json=api_call
+                # )
                 content = response.json()['choices'][0]['message']['content']
                 current_frame_content = f"Frame {idx}'s content: {content}\n"
                 video_summary += current_frame_content
@@ -407,7 +464,7 @@ class FileReader:
         logger.info(f'Setting Reader to {type(self.reader).__name__}')
 
     def read_file(self, file_path: Path, task='describe the file') -> str:
-        suffix = file_path.suffix
+        suffix = '.' + str(file_path).split('.')[-1]
         self.set_reader(suffix)
         if isinstance(self.reader, IMGReader) or isinstance(self.reader, VideoReader):
             file_content = self.reader.parse(file_path, task)
